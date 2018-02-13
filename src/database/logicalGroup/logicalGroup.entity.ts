@@ -1,12 +1,12 @@
 import {Column, PrimaryGeneratedColumn, ClosureEntity, TreeParent, TreeChildren, TreeLevelColumn } from 'typeorm';
 
-@ClosureEntity()
+@ClosureEntity("logicalGroup")
 export class LogicalGroup {
     @PrimaryGeneratedColumn()
     id: number;
 
     @Column()
-    name1: string;
+    name: string;
 
     @TreeParent()
     parent: LogicalGroup;

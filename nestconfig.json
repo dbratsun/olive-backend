@@ -1,4 +1,4 @@
 {
-    "language": "ts | es (default: ts)",
+    "language": "ts",
     "entryFile": "src/main.ts"
 }

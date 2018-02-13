@@ -10,7 +10,7 @@ import { LogicalGroupController } from './logicalGroup.controller';
   imports: [DatabaseModule],
   components: [
     ...logicalGroupProviders,
-    LogicalGroupService,
+    LogicalGroupService
   ],
   controllers: [LogicalGroupController]
 })

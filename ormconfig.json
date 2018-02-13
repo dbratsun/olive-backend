@@ -6,5 +6,6 @@
     "username": "sa",
     "password": "@Press2Play",
     "database": "olive",
-    "entities": ["src/database/**/*.entity{.ts,.js}"]
+    "entities": ["src/database/**/*.entity{.ts,.js}"],
+    "synchronize": "true"
 }]

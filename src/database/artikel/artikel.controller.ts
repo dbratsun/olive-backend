@@ -10,4 +10,5 @@ export class ArtikelController {
     findAll(): Promise<Artikel[]> {
         return this.artikelService.findAll();
     }
+    
 }
