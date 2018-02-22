@@ -1,47 +1,88 @@
-import { TreeRepository, RemoveOptions, DeleteQueryBuilder, EntityRepository } from "typeorm";
+import { TreeRepository, RemoveOptions, DeleteQueryBuilder, EntityRepository, SelectQueryBuilder } from "typeorm";
 import { LogicalGroup } from "../logicalGroup/logicalGroup.entity";
 
 // for delete/move logic
 // s. https://github.com/typeorm/typeorm/issues/193 Remove entity from TreeRepository (Closure table)
+// s. also http://www.waitingforcode.com/mysql/managing-hierarchical-data-in-mysql-closure-table/read
+// s. https://www.slideshare.net/billkarwin/models-for-hierarchical-data
 
-@EntityRepository(LogicalGroup)
-export class TreeRepositoryExt extends TreeRepository<LogicalGroup> {
 
-    /*
-    removeById(id: any, options?: RemoveOptions): Promise<void> {
+export class TreeRepositoryExt<Entity> extends TreeRepository<Entity> {
+
+    async removeAncestors(id: any): Promise<void> {
+    }
+
+    async removeDescendants() {
 
     }
-    */
 
-    /*
-    createDeleteAncestorsQueryBuilder(alias: string, closureTableAlias: string, entity: LogicalGroup): DeleteQueryBuilder<LogicalGroup> {
-        const escapeAlias = (alias: string) => this.manager.connection.driver.escape(alias);
+    async removeById(id: any, options?: RemoveOptions): Promise<void> {
         const escapeColumn = (column: string) => this.manager.connection.driver.escape(column);
-        console.log(escapeAlias(closureTableAlias), " ", escapeColumn("descendant"));
-        return this.createQueryBuilder(alias)
-            .delete()
-            .where(`${escapeAlias(closureTableAlias)}.${escapeColumn("descendant")}=${this.metadata.getEntityIdMap(entity)![this.metadata.primaryColumns[0].propertyName]}`)
-            .execute();
-    }
-    */
-
-    async removeAncestors(entity: LogicalGroup): Promise<void> {
-        const escapeAlias = (alias: string) => this.manager.connection.driver.escape(alias);
-        const escapeColumn = (column: string) => this.manager.connection.driver.escape(column);
-        console.log(entity);
-        console.log(`${escapeAlias("treeEntity")}`);
-        console.log(`${this.metadata.getEntityIdMap(entity)![this.metadata.primaryColumns[0].propertyName]}`);
         await this
             .createQueryBuilder()
             .delete()
-            .from(`${escapeAlias("treeClosure")}`)
-            .where(`${escapeAlias("treeClosure")}.${escapeColumn("descendant")}=${this.metadata.getEntityIdMap(entity)![this.metadata.primaryColumns[0].propertyName]}`)
+            .from(this.metadata.closureJunctionTable.tableName)
+            // .where(`${escapeAlias("treeClosure")}.${escapeColumn("descendant")}=${this.metadata.getEntityIdMap(entity)![this.metadata.primaryColumns[0].propertyName]}`)            
+            // .where(`${this.metadata.closureJunctionTable.tableName}.${escapeColumn("descendant")}=${this.metadata.getEntityIdMap(entity)![this.metadata.primaryColumns[0].propertyName]}`)
+            .where(`${this.metadata.closureJunctionTable.tableName}.${escapeColumn("descendant")}=${id}`)
+            .orWhere(`${this.metadata.closureJunctionTable.tableName}.${escapeColumn("ancestor")}=${id}`)
+            .printSql()
             .execute();
 
-        // return this.createDeleteAncestorsQueryBuilder("treeEntity", "treeClosure", entity);
+        const entity = await this.findOneById(id);    
+        /*    
+        const ids: any[] = await this.findDescendants(entity);
+        console.log("list of ids:")
+        console.log(ids);
+        */
+
+        const qb = await this
+            .createAncestorsQueryBuilder("treeEntity", "treeClosure", entity)
+            .select(`${escapeColumn("treeClosure")}.${escapeColumn("descendant")}`)
+            .where(`${escapeColumn("treeClosure")}.${escapeColumn("ancestor")}=${id}`)
+
+        const qb1 = await this
+            .createAncestorsQueryBuilder("treeEntity", "treeClosure", entity)
+            .select(`${escapeColumn("treeClosure")}.${escapeColumn("descendant")}`)
+            .where(`${escapeColumn("treeClosure")}.${escapeColumn("ancestor")}=${id}`)
+            .printSql()
+            .getMany();
+
+        console.log(qb1);
+
+        await this
+            .createQueryBuilder()
+            .delete()
+            .from(this.metadata.tableName)
+            .where(`${this.metadata.tableName}.${escapeColumn("id")}=${id}`)
+            .orWhere("id in (" + qb.getQuery() + ")")
+            .printSql()
+            .execute();
+
+        return super.removeById(id, options);
     }
 
-    removeDescendants() {
-
+    findAncestorsExt(entity: Entity): Promise<Entity[]> {
+        return this
+            .createAncestorsQueryBuilderExt("treeEntity", "treeClosure", entity)
+            .printSql()
+            .getMany();
     }
+
+    createAncestorsQueryBuilderExt(alias: string, closureTableAlias: string, entity: Entity): SelectQueryBuilder<Entity> {
+
+        // create shortcuts for better readability
+        const escapeAlias = (alias: string) => this.manager.connection.driver.escape(alias);
+        const escapeColumn = (column: string) => this.manager.connection.driver.escape(column);
+
+        const joinCondition = `${escapeAlias(alias)}.${escapeColumn(this.metadata.primaryColumns[0].databaseName)}=${escapeAlias(closureTableAlias)}.${escapeColumn("ancestor")}`;
+        return this.createQueryBuilder(alias)
+            .innerJoin(this.metadata.closureJunctionTable.tableName, closureTableAlias, joinCondition)
+            .where(`${escapeAlias(closureTableAlias)}.${escapeColumn("descendant")}=${this.metadata.getEntityIdMap(entity)![this.metadata.primaryColumns[0].propertyName]}`)
+            .printSql();
+    }
+    
+
+
 }
+

@@ -7,5 +7,7 @@
     "password": "@Press2Play",
     "database": "olive",
     "entities": ["src/database/**/*.entity{.ts,.js}"],
-    "synchronize": "true"
+    "synchronize": "true",
+    "logging": ["query", "error"],
+    "logger": "advanced-console"
 }]
